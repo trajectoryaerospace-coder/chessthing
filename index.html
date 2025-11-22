@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Chessboard 64-Square Calibration</title>
+<style>
+body { background:#111; color:white; text-align:center; font-family:sans-serif; }
+video, canvas { border:2px solid white; margin-top:10px; touch-action:none; }
+#out { white-space:pre; margin-top:20px; font-family:monospace; }
+h2 { margin-bottom:5px; }
+p { margin-top:0; }
+</style>
+</head>
+<body>
+
+<h2>Chessboard 64-Square Calibration (Live)</h2>
+<p>Drag each green dot to the top-left corner of each square. Double-tap to generate arrays.</p>
+
+<video id="video" autoplay playsinline width="640" height="480"></video>
+<canvas id="c" width="640" height="480"></canvas>
+<div id="out"></div>
+
+<script>
+let video = document.getElementById("video");
+let canvas = document.getElementById("c");
+let ctx = canvas.getContext("2d");
+let pts = [];
+let drag = -1;
+
+// Initialize 64 points in grid
+for(let r=0;r<8;r++){
+  for(let c=0;c<8;c++){
+    pts.push({x:50+c*70, y:50+r*50});
+  }
+}
+
+// Access camera
+navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+.then(stream => { video.srcObject = stream; })
+.catch(err => alert("Camera access denied: "+err));
+
+// Draw loop
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(video.readyState === video.HAVE_ENOUGH_DATA){
+    ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  }
+  // draw points
+  ctx.fillStyle = "lime";
+  for(let p of pts){
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,8,0,2*Math.PI);
+    ctx.fill();
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+// Dragging points
+function getTouchPos(e){
+  let rect = canvas.getBoundingClientRect();
+  let x = e.touches ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+  let y = e.touches ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+  return {x,y};
+}
+
+canvas.addEventListener("mousedown", e=>startDrag(e));
+canvas.addEventListener("touchstart", e=>startDrag(e));
+canvas.addEventListener("mousemove", e=>moveDrag(e));
+canvas.addEventListener("touchmove", e=>moveDrag(e));
+canvas.addEventListener("mouseup", e=>drag=-1);
+canvas.addEventListener("touchend", e=>drag=-1);
+
+function startDrag(e){
+  let pos = getTouchPos(e);
+  for(let i=0;i<pts.length;i++){
+    if(Math.hypot(pos.x-pts[i].x,pos.y-pts[i].y)<15) drag=i;
+  }
+}
+function moveDrag(e){
+  if(drag<0) return;
+  let pos = getTouchPos(e);
+  pts[drag].x = pos.x;
+  pts[drag].y = pos.y;
+  e.preventDefault();
+}
+
+// Double-tap / double-click to output arrays
+let lastTap=0;
+canvas.addEventListener("dblclick", outputArrays);
+canvas.addEventListener("touchend", e=>{
+  let current = new Date().getTime();
+  let tapLength = current - lastTap;
+  if(tapLength < 300 && tapLength > 0) outputArrays();
+  lastTap = current;
+});
+
+function outputArrays(){
+  let out = "int sqX[64] = {";
+  for(let i=0;i<64;i++) out+=Math.round(pts[i].x)+",";
+  out+="};\n";
+  out+="int sqY[64] = {";
+  for(let i=0;i<64;i++) out+=Math.round(pts[i].y)+",";
+  out+="};\n";
+  document.getElementById("out").innerText = out;
+  alert("Arrays generated! Copy them for your detection code.");
+}
+</script>
+
+</body>
+</html>
